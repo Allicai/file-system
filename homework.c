@@ -84,6 +84,54 @@ void* fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
  */
 
 
+#define ROOT_INODE_NUM 1
+
+// helper method to translate a path to its inode number
+int path_to_inode(const char *path) {
+
+    // if the path is the root dir, return the root inode #
+    if (strcmp(path, "/") == 0)
+        return ROOT_INODE_NUM;
+
+    // start from root directory's inode #
+    int current_inode_num = ROOT_INODE_NUM;
+
+    // navigate with given
+    while (*path != '\0') {
+        // get the current component of the path
+        const char *next_separator = strchr(path, '/');
+        if (next_separator == NULL)
+            next_separator = path + strlen(path);
+
+        // search for the current component in the dir entries
+        int found = 0;
+        for (int i = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); i++) {
+            struct fs_dirent entry;
+            block_read(&entry, current_inode_num, 1);
+            if (entry.valid && strncmp(entry.name, path, next_separator - path) == 0 &&
+                (strlen(entry.name) == next_separator - path)) {
+                // moving to the next dir
+                current_inode_num = entry.inode; 
+                found = 1;
+                break;
+            }
+        }
+
+        // -1 if nothing is found
+        if (!found)
+            return -1;
+
+        // getting the next part of the path after a '/'
+        path = next_separator;
+        if (*path == '/')
+            path++;
+    }
+
+    // return the inode number of the final part of the path
+    return current_inode_num;
+}
+
+
 
 /* Exercise 1:
  * getattr - get file or directory attributes. For a description of
@@ -110,7 +158,9 @@ void* fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
 {
     /* TODO: your code here */
-    return -EOPNOTSUPP;
+
+    // initialize
+    
 }
 
 
