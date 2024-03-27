@@ -159,7 +159,25 @@ int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
 {
     /* TODO: your code here */
 
-    // initialize
+    int inode_num = path_to_inode(path);
+    if (inode_num == -1)
+        return -ENOENT; // No such file or directory
+
+    // Read the inode corresponding to the path
+    struct fs_inode inode;
+    block_read(&inode, inode_num, 1);
+
+    // Fill in struct stat with inode information
+    sb->st_mode = inode.mode;
+    sb->st_uid = inode.uid;
+    sb->st_gid = inode.gid;
+    sb->st_size = inode.size;
+    sb->st_nlink = 1; // Always set to 1
+    sb->st_atime = inode.mtime; // Last access time
+    sb->st_mtime = inode.mtime; // Last modification time
+    sb->st_ctime = inode.ctime; // Creation time
+
+    return 0; // Success
     
 }
 
