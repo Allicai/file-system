@@ -83,27 +83,22 @@ void* fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
  *   fs_read
  */
 
-
+// inode 1 is the root dir
+// inode 0 is invalid (super)
 #define ROOT_INODE_NUM 1
 
 // helper method to translate a path to its inode number as suggested
-int path_to_inode(const char *path) {
+int path_to_inode(const char *path, int paths) {
     // if the path is the root dir, return the root inode #
     if (strcmp(path, "/") == 0)
         return ROOT_INODE_NUM;
 
     // start from root directory's inode #
     int current_inode_num = ROOT_INODE_NUM;
-
-    // buffer to hold path components
-    char path_buf[MAX_PATH_BYTES];
-    // array to hold individual path components
     char *pathv[MAX_PATH_NAMES];
-    // split the path into components
-    int num_components = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
 
     // navigate through each component of the path
-    for (int i = 1; i < num_components; i++) {
+    for (int i = 1; i < paths; i++) {
         // get the current component of the path
         const char *current_component = pathv[i];
 
@@ -157,8 +152,13 @@ int path_to_inode(const char *path) {
 int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
 {
     /* TODO: your code here */
+    char path_buf[MAX_PATH_BYTES];
+    // array to hold individual path components
+    char *pathv[MAX_PATH_NAMES];
 
-    int inode_num = path_to_inode(path);
+    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
+
+    int inode_num = path_to_inode(path, paths);
     if (inode_num == -1)
         return -ENOENT; // no such file or dir
 
