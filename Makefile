@@ -25,7 +25,7 @@ lab4-fuse: homework.o lab4fuse.o misc.o
 .PHONY: img mount umount
 
 img:
-	python gen-disk1.py test.img > /dev/null
+	python3 gen-disk1.py test.img > /dev/null
 
 mount:
 	mkdir -p fs

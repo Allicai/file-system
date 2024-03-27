@@ -86,9 +86,8 @@ void* fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 
 #define ROOT_INODE_NUM 1
 
-// helper method to translate a path to its inode number
+// helper method to translate a path to its inode number as suggested
 int path_to_inode(const char *path) {
-
     // if the path is the root dir, return the root inode #
     if (strcmp(path, "/") == 0)
         return ROOT_INODE_NUM;
@@ -96,41 +95,41 @@ int path_to_inode(const char *path) {
     // start from root directory's inode #
     int current_inode_num = ROOT_INODE_NUM;
 
-    // navigate with given
-    while (*path != '\0') {
-        // get the current component of the path
-        const char *next_separator = strchr(path, '/');
-        if (next_separator == NULL)
-            next_separator = path + strlen(path);
+    // buffer to hold path components
+    char path_buf[MAX_PATH_BYTES];
+    // array to hold individual path components
+    char *pathv[MAX_PATH_NAMES];
+    // split the path into components
+    int num_components = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
 
-        // search for the current component in the dir entries
+    // navigate through each component of the path
+    for (int i = 1; i < num_components; i++) {
+        // get the current component of the path
+        const char *current_component = pathv[i];
+
+        // search for the current component in the directory entries
         int found = 0;
-        for (int i = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); i++) {
-            struct fs_dirent entry;
-            block_read(&entry, current_inode_num, 1);
-            if (entry.valid && strncmp(entry.name, path, next_separator - path) == 0 &&
-                (strlen(entry.name) == next_separator - path)) {
-                // moving to the next dir
-                current_inode_num = entry.inode; 
+        struct fs_inode current_inode;
+        block_read(&current_inode, current_inode_num, 1);
+        for (int j = 0; j < (FS_BLOCK_SIZE / sizeof(struct fs_dirent)); j++) {
+            struct fs_dirent entry[FS_BLOCK_SIZE / sizeof(struct fs_dirent)];
+            block_read(entry, current_inode.ptrs[j], 1);
+            if (entry[j].valid && strcmp(entry[j].name, current_component) == 0) {
+                // found the current component in the directory
+                current_inode_num = entry[j].inode;
                 found = 1;
                 break;
             }
         }
 
-        // -1 if nothing is found
+        // if current component not found, return error
         if (!found)
-            return -1;
-
-        // getting the next part of the path after a '/'
-        path = next_separator;
-        if (*path == '/')
-            path++;
+            return -ENOENT;
     }
 
     // return the inode number of the final part of the path
     return current_inode_num;
 }
-
 
 
 /* Exercise 1:
@@ -161,23 +160,23 @@ int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
 
     int inode_num = path_to_inode(path);
     if (inode_num == -1)
-        return -ENOENT; // No such file or directory
+        return -ENOENT; // no such file or dir
 
-    // Read the inode corresponding to the path
+    // read the corresponding inode
     struct fs_inode inode;
     block_read(&inode, inode_num, 1);
 
-    // Fill in struct stat with inode information
+    // fill struct with inode info
     sb->st_mode = inode.mode;
     sb->st_uid = inode.uid;
     sb->st_gid = inode.gid;
     sb->st_size = inode.size;
-    sb->st_nlink = 1; // Always set to 1
-    sb->st_atime = inode.mtime; // Last access time
-    sb->st_mtime = inode.mtime; // Last modification time
-    sb->st_ctime = inode.ctime; // Creation time
+    sb->st_nlink = 1; // always 1
+    sb->st_atime = inode.mtime; // last access time
+    sb->st_mtime = inode.mtime; // last mod time
+    sb->st_ctime = inode.ctime; // creation time
 
-    return 0; // Success
+    return 0; // return 0
     
 }
 
