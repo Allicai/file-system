@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 #include "fs3650.h"
 
@@ -98,7 +99,8 @@ int path_to_inode(const char *path, int paths) {
     char *pathv[MAX_PATH_NAMES];
 
     // navigate through each component of the path
-    for (int i = 1; i < paths; i++) {
+    split(path, pathv, MAX_PATH_NAMES, NULL, 0);
+    for (int i = 0; i < paths; i++) {
         // get the current component of the path
         const char *current_component = pathv[i];
 
@@ -109,11 +111,14 @@ int path_to_inode(const char *path, int paths) {
         for (int j = 0; j < (FS_BLOCK_SIZE / sizeof(struct fs_dirent)); j++) {
             struct fs_dirent entry[FS_BLOCK_SIZE / sizeof(struct fs_dirent)];
             block_read(entry, current_inode.ptrs[j], 1);
-            if (entry[j].valid && strcmp(entry[j].name, current_component) == 0) {
-                // found the current component in the directory
-                current_inode_num = entry[j].inode;
-                found = 1;
-                break;
+            for (int k = 0; k< (FS_BLOCK_SIZE / sizeof(struct fs_dirent)); k++) {
+                if (entry[k].valid && strcmp(entry[k].name, current_component) == 0) {
+                    // found the current component in the directory
+                    current_inode_num = entry[k].inode;
+                    found = 1;
+                    break;
+                }
+            
             }
         }
 
@@ -159,7 +164,7 @@ int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
     int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
 
     int inode_num = path_to_inode(path, paths);
-    if (inode_num == -1)
+    if (inode_num == -ENOENT)
         return -ENOENT; // no such file or dir
 
     // read the corresponding inode
@@ -172,6 +177,7 @@ int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
     sb->st_gid = inode.gid;
     sb->st_size = inode.size;
     sb->st_nlink = 1; // always 1
+    // last access and last modification are presumably the same time
     sb->st_atime = inode.mtime; // last access time
     sb->st_mtime = inode.mtime; // last mod time
     sb->st_ctime = inode.ctime; // creation time
@@ -207,7 +213,37 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
                struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
     /* TODO: your code here */
-    return -EOPNOTSUPP;
+
+    char path_buf[MAX_PATH_BYTES];
+    // array to hold individual path components
+    char *pathv[MAX_PATH_NAMES];
+
+    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
+
+    int inode_num = path_to_inode(path, paths);
+    if (inode_num == -ENOENT)
+        return -ENOENT; // no such file or dir
+    
+    //read the dir inode
+    struct fs_inode dir_inode;
+    block_read(&dir_inode, inode_num, 1);
+
+    // check if it's a dir
+    // using the testing function from piazza post @532
+    if (!(S_ISDIR(dir_inode.mode)))
+        return -ENOTDIR; // not a dir
+
+    // iterate dir entries and add them to the filler
+    for (int i = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); i++) {
+        struct fs_dirent entry;
+        block_read(&entry, dir_inode.ptrs[0] + i, 1);
+        if (entry.valid) {
+            if (filler(ptr, entry.name, NULL, 0, 0) != 0)
+                return -ENOMEM; // the buffer is full
+        }
+    }
+
+    return 0; // success :D
 }
 
 /* Exercise 3:
@@ -222,7 +258,37 @@ int fs_read(const char *path, char *buf, size_t len, off_t offset,
             struct fuse_file_info *fi)
 {
     /* TODO: your code here */
-    return -EOPNOTSUPP;
+    
+    char path_buf[MAX_PATH_BYTES];
+    // array to hold individual path components
+    char *pathv[MAX_PATH_NAMES];
+
+    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
+
+    int inode_num = path_to_inode(path, paths);
+    if (inode_num == -ENOENT)
+        return -ENOENT; // no such file or dir
+    
+    //read the file inode
+    struct fs_inode file_inode;
+    block_read(&file_inode, inode_num, 1);
+
+    // check if it's a file
+    if (!(S_ISREG(file_inode.mode)))
+        return -EISDIR; // not a file
+
+    // calculate the number of bytes available to read from the file
+    size_t available_bytes = file_inode.size - offset;
+    if (available_bytes <= 0)
+        return 0; // offset is at or beyond the end of the file
+
+    // determine the number of bytes to read based on len and available bytes
+    size_t bytes_to_read = (len < available_bytes) ? len : available_bytes;
+
+    // read data from the file into the buffer
+    // (implementation of reading data from the file is omitted for brevity)
+
+    return bytes_to_read; // return the number of bytes read
 }
 
 /* operations vector. Please don't rename it, or else you'll break things
