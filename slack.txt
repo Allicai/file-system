@@ -2,7 +2,6 @@ Name: Vinit Patel
 NUID: 002181048
 slack hours used: 30
 remaining slack hours: 90
-Taking the challenge (optional): No
 
 ---
 
@@ -11,7 +10,5 @@ N/A
 
 Source material that you consulted:
 
-
 Other acknowledgments:
-Did some searching on how to use random in python in reference to generating the commands 
-for pressure.txt and large.txt
+
