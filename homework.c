@@ -227,12 +227,8 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
         struct fs_dirent entry;
         block_read(&entry, dir_inode.ptrs[0] + i, 1);
         if (entry.valid) {
-            struct stat sb;
-            int getattr_res = fs_getattr(entry.name, &sb, NULL);
-            if (getattr_res < 0)
-                return getattr_res; // returns an error if getattr fails
-            
-            filler(ptr, entry.name, &sb, 0, 0);
+            if (filler(ptr, entry.name, NULL, 0, 0) != 0)
+                return -ENOMEM; // memory error
         }
         
     }   
