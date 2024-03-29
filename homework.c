@@ -222,23 +222,20 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
     if (!(S_ISDIR(dir_inode.mode)))
         return -ENOTDIR; // not a dir
 
-    // iterate throguh all the blocks of the directory
-    for (int i = 0; i < sizeof(dir_inode.ptrs) / sizeof(dir_inode.ptrs[0]); i++) {
-        char block_data[FS_BLOCK_SIZE];
-        block_read(block_data, dir_inode.ptrs[i], 1);
-    
-
-        // iterate dir entries and add them to the filler
-        for (int j = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); j++) {
-            struct fs_dirent entry;
-            memcpy(&entry, block_data + j * sizeof(struct fs_dirent), sizeof(struct fs_dirent));
-
-            if (entry.valid) {
-                if (filler(ptr, entry.name, NULL, 0, 0) != 0)
-                    return -ENOMEM; // the buffer is full
-            }
+    // iterate dir entries and add them to the filler
+    for (int i = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); i++) {
+        struct fs_dirent entry;
+        block_read(&entry, dir_inode.ptrs[0] + i, 1);
+        if (entry.valid) {
+            struct stat sb;
+            int getattr_res = fs_getattr(entry.name, &sb, NULL);
+            if (getattr_res < 0)
+                return getattr_res; // returns an error if getattr fails
+            
+            filler(ptr, entry.name, &sb, 0, 0);
         }
-    }
+        
+    }   
 
     return 0; // success :D
 }
