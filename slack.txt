@@ -1,7 +1,7 @@
 Name: Vinit Patel
 NUID: 002181048
-slack hours used: 30
-remaining slack hours: 90
+slack hours used: 39
+remaining slack hours: 81
 Taking the challenge (optional): No
 
 ---
