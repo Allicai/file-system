@@ -97,7 +97,7 @@ int path_to_inode(const char *path) {
     // start from root directory's inode #
     int current_inode_num = ROOT_INODE_NUM;
     char *pathv[MAX_PATH_NAMES];
-    char *path_buf[MAX_PATH_BYTES];
+    char path_buf[MAX_PATH_BYTES];
     
 
     // navigate through each component of the path
