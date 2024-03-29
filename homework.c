@@ -89,7 +89,7 @@ void* fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 #define ROOT_INODE_NUM 1
 
 // helper method to translate a path to its inode number as suggested
-int path_to_inode(const char *path, int paths) {
+int path_to_inode(const char *path) {
     // if the path is the root dir, return the root inode #
     if (strcmp(path, "/") == 0)
         return ROOT_INODE_NUM;
@@ -97,9 +97,11 @@ int path_to_inode(const char *path, int paths) {
     // start from root directory's inode #
     int current_inode_num = ROOT_INODE_NUM;
     char *pathv[MAX_PATH_NAMES];
+    char *path_buf[MAX_PATH_BYTES];
+    
 
     // navigate through each component of the path
-    split(path, pathv, MAX_PATH_NAMES, NULL, 0);
+    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
     for (int i = 0; i < paths; i++) {
         // get the current component of the path
         const char *current_component = pathv[i];
@@ -156,14 +158,7 @@ int path_to_inode(const char *path, int paths) {
  */
 int fs_getattr(const char *path, struct stat *sb, struct fuse_file_info *fi)
 {
-    /* TODO: your code here */
-    char path_buf[MAX_PATH_BYTES];
-    // array to hold individual path components
-    char *pathv[MAX_PATH_NAMES];
-
-    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
-
-    int inode_num = path_to_inode(path, paths);
+    int inode_num = path_to_inode(path);
     if (inode_num == -ENOENT)
         return -ENOENT; // no such file or dir
 
@@ -214,13 +209,7 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
 {
     /* TODO: your code here */
 
-    char path_buf[MAX_PATH_BYTES];
-    // array to hold individual path components
-    char *pathv[MAX_PATH_NAMES];
-
-    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
-
-    int inode_num = path_to_inode(path, paths);
+    int inode_num = path_to_inode(path);
     if (inode_num == -ENOENT)
         return -ENOENT; // no such file or dir
     
@@ -259,13 +248,7 @@ int fs_read(const char *path, char *buf, size_t len, off_t offset,
 {
     /* TODO: your code here */
     
-    char path_buf[MAX_PATH_BYTES];
-    // array to hold individual path components
-    char *pathv[MAX_PATH_NAMES];
-
-    int paths = split(path, pathv, MAX_PATH_NAMES, path_buf, MAX_PATH_BYTES);
-
-    int inode_num = path_to_inode(path, paths);
+    int inode_num = path_to_inode(path);
     if (inode_num == -ENOENT)
         return -ENOENT; // no such file or dir
     
@@ -285,8 +268,33 @@ int fs_read(const char *path, char *buf, size_t len, off_t offset,
     // determine the number of bytes to read based on len and available bytes
     size_t bytes_to_read = (len < available_bytes) ? len : available_bytes;
 
+    // calculate the block index and offset within the block for the start of reading
+    int block_index = offset / FS_BLOCK_SIZE;
+    int block_offset = offset % FS_BLOCK_SIZE;
+
     // read data from the file into the buffer
-    // (implementation of reading data from the file is omitted for brevity)
+    size_t bytes_read = 0;
+    while (bytes_read < bytes_to_read) {
+        // read data from the current block
+        char block_data[FS_BLOCK_SIZE];
+        block_read(block_data, file_inode.ptrs[block_index], 1);
+
+        // calculate the number of bytes to copy from the block to the buffer
+        size_t bytes_to_copy = (bytes_to_read - bytes_read < FS_BLOCK_SIZE - block_offset) ?
+                               bytes_to_read - bytes_read : FS_BLOCK_SIZE - block_offset;
+
+        // copy data from block_data to buf
+        memcpy(buf + bytes_read, block_data + block_offset, bytes_to_copy);
+
+        // update variables for next iteration
+        bytes_read += bytes_to_copy;
+        block_index++;
+        block_offset = 0; // for subsequent blocks, start reading from the beginning
+
+        // if all bytes have been read or we've reached the end of the file, break
+        if (bytes_read >= bytes_to_read || bytes_read + offset >= file_inode.size)
+            break;
+    }
 
     return bytes_to_read; // return the number of bytes read
 }
@@ -299,4 +307,3 @@ struct fuse_operations fs_ops = {
     .readdir = fs_readdir,
     .read = fs_read,
 };
-
