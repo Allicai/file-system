@@ -21,7 +21,9 @@
 #include <assert.h>
 #include <sys/stat.h>
 
+
 #include "fs3650.h"
+
 
 /* disk access. All access is in terms of 4KB blocks; read and
  * write functions return 0 (success) or -EIO.
@@ -209,29 +211,35 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
 {
     /* TODO: your code here */
 
-    int inode_num = path_to_inode(path);
-    if (inode_num == -ENOENT)
-        return -ENOENT; // no such file or dir
-    
-    //read the dir inode
-    struct fs_inode dir_inode;
-    block_read(&dir_inode, inode_num, 1);
+    struct fs_inode inode;
+    memset(&inode, 0, sizeof(inode));
 
-    // check if it's a dir
-    // using the testing function from piazza post @532
-    if (!(S_ISDIR(dir_inode.mode)))
+    if (path_to_inode(path) != 0) {
+        return -ENOENT; // no path found
+    }
+
+    if (!(S_ISDIR(inode.mode))) {
         return -ENOTDIR; // not a dir
+    }
 
-    // iterate dir entries and add them to the filler
+    struct fs_dirent entry[FS_BLOCK_SIZE / sizeof(struct fs_dirent)];
+    if (block_read(entry, inode.ptrs[0], 1) != 0) {
+        return -EIO; // I/O error
+    }
+
+    // iterate over dir entries
     for (int i = 0; i < FS_BLOCK_SIZE / sizeof(struct fs_dirent); i++) {
-        struct fs_dirent entry;
-        block_read(&entry, dir_inode.ptrs[0] + i, 1);
-        if (entry.valid) {
-            if (filler(ptr, entry.name, NULL, 0, 0) != 0)
-                return -ENOMEM; // memory error
+        if (entry[i].valid) {
+            struct stat st;
+            memset(&st, 0, sizeof(st));
+            st.st_ino = entry[i].inode;
+            st.st_mode = S_IFDIR;
+
+            if (filler(ptr, entry[i].name, &st, 0, 0)) {
+                break; // buffer is full
+            }
         }
-        
-    }   
+    }
 
     return 0; // success :D
 }
