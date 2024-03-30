@@ -214,9 +214,13 @@ int fs_readdir(const char *path, void *ptr, fuse_fill_dir_t filler, off_t offset
     struct fs_inode inode;
     memset(&inode, 0, sizeof(inode));
 
-    if (path_to_inode(path) != 0) {
-        return -ENOENT; // no path found
+    int inode_num = path_to_inode(path);
+
+    if (inode_num < 0) {
+        return inode_num; // no path found
     }
+
+    block_read(&inode, inode_num, 1);
 
     if (!(S_ISDIR(inode.mode))) {
         return -ENOTDIR; // not a dir
