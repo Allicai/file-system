@@ -40,7 +40,7 @@ test_file_attributes() {
 }
 
 # test dir contents
-test_dir_contents "dir dir1 dir2 dir-with-long-name file.1 file.2"
+test_dir_contents "fs/" "dir dir1 dir2 dir-with-long-name file.1 file.2"
 test_dir_contents "fs/dir" "file1 file2 file3"
 test_dir_contents "fs/dir1" "long-file-name subdir"
 test_dir_contents "fs/dir1/subdir" ""
