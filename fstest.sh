@@ -18,13 +18,9 @@ test_dir_contents() {
 test_file_checksum() {
     file="$1"
     expected_checksum="$2"
-    expected_size="$3"
+    result=$(cksum $file)
 
-    result=$(cksum "$file")
-    checksum=$(echo "$result" | awk '{print $1}')
-    size=$(echo "$result" | awk '{print $2}')
-
-    if [ "$checksum $size" != "$expected_checksum $expected_size" ]; then
+    if [ "$result" != "$expected_checksum" ]; then
         echo "CKSUM $file"
         exit 1
     fi
@@ -33,14 +29,11 @@ test_file_checksum() {
 # test file attributes
 test_file_attributes() {
     file="$1"
-    expected_mode="$2"
-    expected_size="$3"
+    expected_output="$2"
 
-    result=$(stat -c '%f %s' "$file")
-    mode=$(echo "$result" | awk '{print $1}')
-    size=$(echo "$result" | awk '{print $2}')
+    result=$(stat -c '%f %s' $file)
 
-    if [ "$mode $size" != "$expected_mode $expected_size" ]; then
+    if [ "$result" != "$expected_output" ]; then
         echo "MODE $file"
         exit 1
     fi
