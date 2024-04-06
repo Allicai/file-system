@@ -6,10 +6,10 @@ test_dir_contents() {
     expected_names="$2"
 
     names=$(ls $dir)
-    names=$(echo $names | tr '\n' ' ') # converting newlines into spaces???
+    names=$(echo $names) 
 
     if [ "$names" != "$expected_names" ]; then
-        echo "DIRNAMES $dir"
+        echo "DIRNAMES $dir $names $expected_names"
         exit 1
     fi
 }
@@ -45,7 +45,7 @@ test_dir_contents "fs/dir" "file1 file2 file3"
 test_dir_contents "fs/dir1" "long-file-name subdir"
 test_dir_contents "fs/dir1/subdir" ""
 test_dir_contents "fs/dir-with-long-name" "2nd-file-with-long-name"
-test_dir_contents "fs/dir2" "twenty-six-character-name twenty-seven-character-name"
+test_dir_contents "fs/dir2" "twenty-seven-character-name twenty-six--character-name"
 
 # test file checksums
 test_file_checksum "fs/file.1" "2178593158 900 fs/file.1"
@@ -54,7 +54,7 @@ test_file_checksum "fs/dir1/long-file-name" "2928220301 1025 fs/dir1/long-file-n
 test_file_checksum "fs/dir2/twenty-seven-character-name" "3761062583 100 fs/dir2/twenty-seven-character-name"
 test_file_checksum "fs/dir2/twenty-six--character-name" "3611217367 100 fs/dir2/twenty-six--character-name"
 test_file_checksum "fs/dir/file1" "2893082884 100 fs/dir/file1"
-test_file_checksum "fs/dir/file2" "327293107 1200 fs/dir/2"
+test_file_checksum "fs/dir/file2" "327293107 1200 fs/dir/file2"
 test_file_checksum "fs/dir/file3" "926221923 10111 fs/dir/file3"
 test_file_checksum "fs/dir-with-long-name/2nd-file-with-long-name" "558398486 200 fs/dir-with-long-name/2nd-file-with-long-name"
 
