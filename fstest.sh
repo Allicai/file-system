@@ -5,7 +5,8 @@ test_dir_contents() {
     dir="$1"
     expected_names="$2"
 
-    names=$(ls "$dir")
+    names=$(ls $dir)
+    names=$(echo $names | tr '\n' ' ') # converting newlines into spaces???
 
     if [ "$names" != "$expected_names" ]; then
         echo "DIRNAMES $dir"
